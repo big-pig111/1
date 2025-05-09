@@ -390,49 +390,62 @@ function gameEnd() {
     queryScore();
 }
 //Save user score
-function saveScore(){
-    var db = openDatabase("demo100","","",1024*1024*10);
-    db.transaction(function(tx){
-        tx.executeSql("create table if not exists scoreRank(username varchar(50), score varchar(50))");
-    },function(trans,err){
-        console.log(err);
+// ======== 修复1：修改数据存储方式 ========
+// 改用localStorage替代Web SQL
+const MAX_RECORDS = 100;
+
+function saveScore() {
+    let records = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+    
+    // 添加新记录
+    records.push({
+        username: username,
+        score: scoreNumber,
+        timestamp: new Date().getTime() // 添加时间戳用于去重
     });
-    db.transaction(function(tx){
-        tx.executeSql("insert into scoreRank values(?,?)",[username,scoreNumber]);
-    },function(trans,err){
-        console.log(trans);
-        console.log(err)
-    },function(success){
-        console.log(success);
-    });
+
+    // 排序并保留前MAX_RECORDS条
+    records.sort((a, b) => b.score - a.score || a.timestamp - b.timestamp);
+    records = records.slice(0, MAX_RECORDS);
+
+    localStorage.setItem('leaderboard', JSON.stringify(records));
 }
-//Get leaderboard
-function queryScore(){
-    var db = openDatabase("demo100","","",1024*1024*10);
-    db.transaction(function(tx){
-        tx.executeSql("select * from scoreRank order by score desc",[],function(trans,rs){
-            console.log(rs.rows.length);
-            if(rs.rows.length==0){return;}
-            else if(rs.rows.length==1){
-                document.getElementById("scoreRank").innerHTML='<tr><td><div id="firstIcon"></div></td><td>'+
-                    rs.rows[0].username+'</td><td>'+rs.rows[0].score+'</td></tr>'+
-                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>'+
-                    '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            }
-            else if(rs.rows.length==2){
-                document.getElementById("scoreRank").innerHTML='<tr><td><div id="firstIcon"></div></td><td>'+
-                    rs.rows[0].username+'</td><td>'+rs.rows[0].score+'</td></tr>'+
-                    '<tr><td><div id="secondIcon"></div></td><td>'+
-                    rs.rows[1].username+'</td><td>'+rs.rows[1].score+'</td></tr>'+
-                    '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            }
-            else if(rs.rows.length>2) {
-                document.getElementById("scoreRank").innerHTML = '<tr><td><div id="firstIcon"></div></td><td>' +
-                    rs.rows[0].username + '</td><td>' + rs.rows[0].score + '</td></tr>' +
-                    '<tr><td><div id="secondIcon"></div></td><td>' +
-                    rs.rows[1].username + '</td><td>' + rs.rows[1].score + '</td></tr>' +
-                    '<tr><td><div id="thirdIcon"></div></td><td>' +
-                    rs.rows[2].username + '</td><td>' + rs.rows[2].score + '</td></tr>';
+
+// ======== 修复2：优化排行榜查询 ========
+function queryScore() {
+    const records = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+    const topScores = records.slice(0, 3); // 取前三名
+    const rankIcons = ['firstIcon', 'secondIcon', 'thirdIcon'];
+    
+    let html = '';
+    
+    // 动态生成排名行
+    for (let i = 0; i < 3; i++) {
+        html += `
+        <tr>
+            <td><div class="${rankIcons[i]}"></div></td>
+            <td>${topScores[i]?.username || '---'}</td>
+            <td>${topScores[i]?.score ?? '---'}</td>
+        </tr>`;
+    }
+
+    document.getElementById("scoreRank").innerHTML = html;
+}
+
+// ======== 修复3：添加数据验证 ========
+// 在游戏开始时初始化存储
+function initStorage() {
+    if (!localStorage.getItem('leaderboard')) {
+        localStorage.setItem('leaderboard', JSON.stringify([]));
+    }
+}
+
+// 在window.onload中添加初始化
+window.onload = function () {
+    initStorage(); // 新增初始化
+    document.getElementById("bgmusic").play();
+    // ...原有其他代码...
+}
             }
         });
     });
