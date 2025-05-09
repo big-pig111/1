@@ -390,48 +390,116 @@ function gameEnd() {
     queryScore();
 }
 // 保存用户分数
-function saveScore() {
-    var db = openDatabase("demo100", "", "", 1024 * 1024 * 10);
-    db.transaction(function (tx) {
-        tx.executeSql("create table if not exists scoreRank(username varchar(50), score varchar(50))", [], function () {
-            // 创建表成功后插入数据
-            tx.executeSql("insert into scoreRank values(?,?)", [username, scoreNumber], function () {
-                console.log("数据插入成功");
-            }, function (trans, err) {
-                console.log("数据插入失败", err);
-            });
-        }, function (trans, err) {
-            console.log("创建表失败", err);
-        });
+// 使用IndexedDB替代Web SQL
+function initDatabase() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("TaikoGame", 1);
+        
+        request.onupgradeneeded = function(event) {
+            const db = event.target.result;
+            const store = db.createObjectStore("scoreRank", { keyPath: "id", autoIncrement: true });
+            store.createIndex("byScore", "score", { unique: false });
+        };
+        
+        request.onsuccess = function(event) {
+            resolve(event.target.result);
+        };
+        
+        request.onerror = function(event) {
+            reject(new Error("Database error: " + event.target.errorCode));
+        };
     });
 }
 
-// 获取排行榜
-function queryScore() {
-    var db = openDatabase("demo100", "", "", 1024 * 1024 * 10);
-    db.transaction(function (tx) {
-        tx.executeSql("select * from scoreRank order by score desc", [], function (trans, rs) {
-            var html = "";
-            if (rs.rows.length == 0) {
-                html = '<tr><td><div id="firstIcon"></div></td><td>No data</td><td>No data</td></tr>' +
-                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>' +
-                    '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            } else if (rs.rows.length == 1) {
-                html = '<tr><td><div id="firstIcon"></div></td><td>' +
-                    rs.rows[0].username + '</td><td>' + rs.rows[0].score + '</td></tr>' +
-                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>' +
-                    '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            } else if (rs.rows.length > 2) {
-                html = '<tr><td><div id="firstIcon"></div></td><td>' +
-                    rs.rows[0].username + '</td><td>' + rs.rows[0].score + '</td></tr>' +
-                    '<tr><td><div id="secondIcon"></div></td><td>' +
-                    rs.rows[1].username + '</td><td>' + rs.rows[1].score + '</td></tr>' +
-                    '<tr><td><div id="thirdIcon"></div></td><td>' +
-                    rs.rows[2].username + '</td><td>' + rs.rows[2].score + '</td></tr>';
+// 保存分数到IndexedDB
+async function saveScore() {
+    try {
+        const db = await initDatabase();
+        const transaction = db.transaction(["scoreRank"], "readwrite");
+        const store = transaction.objectStore("scoreRank");
+        
+        store.add({ username, score: scoreNumber, timestamp: new Date() });
+        
+        transaction.oncomplete = function() {
+            console.log("Score saved successfully");
+        };
+        
+        transaction.onerror = function(event) {
+            console.error("Error saving score:", event.target.error);
+        };
+    } catch (error) {
+        console.error("Database error:", error);
+    }
+}
+
+// 从IndexedDB获取排行榜数据
+async function queryScore() {
+    try {
+        const db = await initDatabase();
+        const transaction = db.transaction(["scoreRank"], "readonly");
+        const store = transaction.objectStore("scoreRank");
+        const index = store.index("byScore");
+        
+        // 获取所有分数并按降序排列
+        const request = index.openCursor(null, "prev");
+        const scores = [];
+        
+        request.onsuccess = function(event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                scores.push(cursor.value);
+                cursor.continue();
+            } else {
+                updateLeaderboard(scores);
             }
-            document.getElementById("scoreRank").innerHTML = html;
-        }, function (trans, err) {
-            console.log("查询排行榜失败", err);
-        });
-    });
+        };
+        
+        request.onerror = function(event) {
+            console.error("Error querying scores:", event.target.error);
+        };
+    } catch (error) {
+        console.error("Database error:", error);
+    }
+}
+
+// 更新排行榜UI
+function updateLeaderboard(scores) {
+    const scoreRank = document.getElementById("scoreRank");
+    
+    if (scores.length === 0) {
+        scoreRank.innerHTML = `
+            <tr><td><div id="firstIcon"></div></td><td>No data</td><td>No data</td></tr>
+            <tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>
+            <tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    // 最多显示前三名
+    for (let i = 0; i < Math.min(3, scores.length); i++) {
+        const iconId = i === 0 ? "firstIcon" : i === 1 ? "secondIcon" : "thirdIcon";
+        html += `
+            <tr>
+                <td><div id="${iconId}"></div></td>
+                <td>${scores[i].username}</td>
+                <td>${scores[i].score}</td>
+            </tr>
+        `;
+    }
+    
+    // 填充空行
+    for (let i = scores.length; i < 3; i++) {
+        const iconId = i === 0 ? "firstIcon" : i === 1 ? "secondIcon" : "thirdIcon";
+        html += `
+            <tr>
+                <td><div id="${iconId}"></div></td>
+                <td>No data</td>
+                <td>No data</td>
+            </tr>
+        `;
+    }
+    
+    scoreRank.innerHTML = html;
 }
