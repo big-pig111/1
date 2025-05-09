@@ -698,3 +698,188 @@ async function connectWallet() {
     alert('Failed to connect wallet: ' + error.message);
   }
 }
+// Solana钱包连接功能
+let wallet;
+let connection;
+let publicKey;
+
+// 初始化Solana连接
+function initSolana() {
+  try {
+    // 检查钱包适配器库是否加载
+    if (!window.SolanaWalletAdapterWALLETS) {
+      throw new Error('钱包适配器库未加载，请刷新页面重试');
+    }
+    
+    // 连接到Solana网络（可切换为mainnet-beta）
+    connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl('devnet'),
+      'confirmed'
+    );
+    
+    // 可用的钱包适配器列表
+    const wallets = [
+      new window.SolanaWalletAdapterWALLETS.PhantomWalletAdapter(),
+      new window.SolanaWalletAdapterWALLETS.SolflareWalletAdapter(),
+      new window.SolanaWalletAdapterWALLETS.SlopeWalletAdapter(),
+      // 添加更多支持的钱包...
+    ];
+    
+    return { connection, wallets };
+  } catch (error) {
+    console.error('Solana初始化失败:', error);
+    showToast('连接钱包失败: ' + error.message, 'error');
+    throw error;
+  }
+}
+
+// 连接钱包
+async function connectWallet() {
+  try {
+    // 显示加载状态
+    const connectBtn = document.getElementById('connectWalletBtn');
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 连接中...';
+    
+    const { wallets } = initSolana();
+    
+    // 尝试自动连接已授权的钱包
+    wallet = wallets.find(w => w.autoConnect && w.name === 'Phantom');
+    
+    if (!wallet) {
+      // 如果没有自动连接的钱包，使用第一个可用钱包
+      wallet = wallets[0];
+    }
+    
+    // 监听连接状态变化
+    wallet.on('connect', (pk) => {
+      console.log('钱包已连接:', pk.toBase58());
+      publicKey = pk;
+      updateWalletUI(pk);
+      showToast('钱包连接成功!', 'success');
+    });
+    
+    wallet.on('disconnect', () => {
+      console.log('钱包已断开');
+      publicKey = null;
+      updateWalletUI(null);
+    });
+    
+    // 连接钱包
+    await wallet.connect();
+    
+  } catch (error) {
+    console.error('连接钱包失败:', error);
+    
+    // 特定错误处理
+    if (error.message.includes('User rejected the request')) {
+      showToast('用户拒绝了连接请求', 'warning');
+    } else if (error.message.includes('No wallet found')) {
+      showToast('未找到钱包插件，请安装Phantom钱包', 'error');
+      setTimeout(() => {
+        window.open('https://phantom.app/', '_blank');
+      }, 1000);
+    } else {
+      showToast('连接钱包失败: ' + error.message, 'error');
+    }
+    
+  } finally {
+    // 恢复按钮状态
+    const connectBtn = document.getElementById('connectWalletBtn');
+    connectBtn.disabled = false;
+    connectBtn.innerHTML = '<i class="fa fa-wallet mr-2"></i> 连接钱包';
+  }
+}
+
+// 断开钱包连接
+async function disconnectWallet() {
+  try {
+    if (wallet) {
+      await wallet.disconnect();
+      showToast('钱包已断开连接', 'info');
+    }
+  } catch (error) {
+    console.error('断开钱包失败:', error);
+    showToast('断开钱包失败: ' + error.message, 'error');
+  }
+}
+
+// 更新钱包UI
+function updateWalletUI(pubkey) {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const walletInfo = document.getElementById('walletInfo');
+  const walletAddress = document.getElementById('walletAddress');
+  
+  if (pubkey) {
+    connectBtn.classList.add('hidden');
+    walletInfo.classList.remove('hidden');
+    walletAddress.textContent = pubkey.toBase58().substring(0, 4) + '...' + pubkey.toBase58().substring(38);
+  } else {
+    connectBtn.classList.remove('hidden');
+    walletInfo.classList.add('hidden');
+  }
+}
+
+// 显示通知提示
+function showToast(message, type = 'info') {
+  const toastContainer = document.createElement('div');
+  toastContainer.className = 'fixed bottom-4 right-4 z-50 flex items-center px-4 py-3 rounded-lg shadow-lg transform transition-all duration-500';
+  
+  // 根据类型设置样式
+  if (type === 'success') {
+    toastContainer.classList.add('bg-green-500', 'text-white');
+  } else if (type === 'error') {
+    toastContainer.classList.add('bg-red-500', 'text-white');
+  } else if (type === 'warning') {
+    toastContainer.classList.add('bg-yellow-500', 'text-white');
+  } else {
+    toastContainer.classList.add('bg-blue-500', 'text-white');
+  }
+  
+  toastContainer.innerHTML = `
+    <i class="fa fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} mr-2"></i>
+    <span>${message}</span>
+  `;
+  
+  document.body.appendChild(toastContainer);
+  
+  // 显示动画
+  setTimeout(() => {
+    toastContainer.classList.add('translate-y-0');
+  }, 10);
+  
+  // 自动关闭
+  setTimeout(() => {
+    toastContainer.classList.add('opacity-0', 'translate-y-4');
+    setTimeout(() => {
+      document.body.removeChild(toastContainer);
+    }, 500);
+  }, 3000);
+}
+
+// 初始化钱包连接
+function initWalletConnection() {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const disconnectBtn = document.getElementById('disconnectWalletBtn');
+  
+  if (connectBtn && disconnectBtn) {
+    connectBtn.addEventListener('click', connectWallet);
+    disconnectBtn.addEventListener('click', disconnectWallet);
+  }
+  
+  // 检查是否已有授权的钱包
+  setTimeout(() => {
+    if (window.solana && window.solana.isPhantom) {
+      // 显示快速连接提示
+      showToast('点击"连接钱包"可快速授权', 'info');
+    }
+  }, 1000);
+}
+
+// 在页面加载时初始化
+window.onload = function() {
+  // 原有游戏初始化代码...
+  
+  // 初始化钱包连接
+  initWalletConnection();
+}
