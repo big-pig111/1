@@ -437,3 +437,134 @@ function queryScore(){
         });
     });
 }
+// 全局变量
+let wallet;
+let publicKey;
+let connection;
+
+// 初始化Solana连接
+async function initSolana() {
+  try {
+    // 检查浏览器是否安装了Phantom钱包
+    if (!window.solana || !window.solana.isPhantom) {
+      throw new Error('请安装Phantom钱包插件');
+    }
+    
+    // 连接到Solana网络（这里使用devnet，生产环境建议使用mainnet-beta）
+    connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl('devnet'),
+      'confirmed'
+    );
+    
+    wallet = window.solana;
+    return true;
+    
+  } catch (error) {
+    console.error('Solana初始化失败:', error);
+    alert(error.message);
+    return false;
+  }
+}
+
+// 连接钱包
+async function connectWallet() {
+  try {
+    // 初始化Solana
+    const isInitialized = await initSolana();
+    if (!isInitialized) return;
+    
+    // 请求连接钱包
+    const response = await wallet.connect();
+    publicKey = response.publicKey;
+    
+    // 更新UI
+    updateWalletUI();
+    
+    // 获取并显示余额
+    getWalletBalance();
+    
+    console.log('钱包连接成功:', publicKey.toBase58());
+    
+  } catch (error) {
+    console.error('连接钱包失败:', error);
+    
+    // 处理用户拒绝连接的情况
+    if (error.message.includes('denied')) {
+      alert('您已拒绝连接请求');
+    } else {
+      alert('连接钱包时出错: ' + error.message);
+    }
+  }
+}
+
+// 断开钱包连接
+async function disconnectWallet() {
+  try {
+    if (wallet && wallet.disconnect) {
+      await wallet.disconnect();
+    }
+    
+    publicKey = null;
+    updateWalletUI();
+    console.log('钱包已断开连接');
+    
+  } catch (error) {
+    console.error('断开连接失败:', error);
+    alert('断开连接时出错: ' + error.message);
+  }
+}
+
+// 获取钱包余额
+async function getWalletBalance() {
+  if (!publicKey || !connection) return;
+  
+  try {
+    const balance = await connection.getBalance(publicKey);
+    const solBalance = balance / solanaWeb3.LAMPORTS_PER_SOL;
+    
+    document.getElementById('walletBalance').textContent = 
+      `余额: ${solBalance.toFixed(4)} SOL`;
+      
+  } catch (error) {
+    console.error('获取余额失败:', error);
+    document.getElementById('walletBalance').textContent = '无法获取余额';
+  }
+}
+
+// 更新钱包UI
+function updateWalletUI() {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const walletInfo = document.getElementById('walletInfo');
+  const walletAddress = document.getElementById('walletAddress');
+  
+  if (publicKey) {
+    // 已连接
+    connectBtn.classList.add('hidden');
+    walletInfo.classList.remove('hidden');
+    
+    // 显示截断的钱包地址
+    const address = publicKey.toBase58();
+    walletAddress.textContent = 
+      `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
+  } else {
+    // 未连接
+    connectBtn.classList.remove('hidden');
+    walletInfo.classList.add('hidden');
+  }
+}
+
+// 初始化事件监听
+document.addEventListener('DOMContentLoaded', () => {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const disconnectBtn = document.getElementById('disconnectWalletBtn');
+  
+  if (connectBtn) connectBtn.addEventListener('click', connectWallet);
+  if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectWallet);
+  
+  // 检查是否已连接钱包
+  if (window.solana && window.solana.isPhantom && window.solana.publicKey) {
+    publicKey = window.solana.publicKey;
+    updateWalletUI();
+    getWalletBalance();
+  }
+});
