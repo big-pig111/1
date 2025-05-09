@@ -1,4 +1,70 @@
-/**
+// 存储分数到本地存储
+function saveScore(username, score) {
+    // 获取现有分数
+    let scores = JSON.parse(localStorage.getItem('taikoScores')) || [];
+    
+    // 添加新分数
+    scores.push({name: username, score: score});
+    
+    // 排序（降序）
+    scores.sort((a, b) => b.score - a.score);
+    
+    // 保留前三名
+    if (scores.length > 3) scores = scores.slice(0, 3);
+    
+    // 保存回本地存储
+    localStorage.setItem('taikoScores', JSON.stringify(scores));
+    
+    return scores;
+}
+
+// 更新排行榜显示
+function updateLeaderboard() {
+    const scores = JSON.parse(localStorage.getItem('taikoScores')) || [];
+    
+    // 清空表格
+    const tableBody = document.querySelector('#scoreRank tbody');
+    tableBody.innerHTML = '';
+    
+    // 填充表格
+    scores.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${entry.name}</td>
+            <td>${entry.score}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    // 如果不足3条记录，添加空行
+    for (let i = scores.length; i < 3; i++) {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${i + 1}</td><td>None</td><td>0</td>`;
+        tableBody.appendChild(row);
+    }
+}
+
+// 游戏结束时调用
+function gameOver(score) {
+    const username = document.getElementById('username').value || 'Guest';
+    
+    // 保存分数
+    const highScores = saveScore(username, score);
+    
+    // 更新最终分数显示
+    document.getElementById('finalScore').textContent = score;
+    
+    // 更新排行榜
+    updateLeaderboard();
+    
+    // 显示结束界面
+    document.getElementById('endBox').style.display = 'block';
+    document.getElementById('taikoBox').style.display = 'none';
+    
+    // 播放结束音乐
+    document.getElementById('endmusic').play();
+}/**
  * Created by yuanyaoqi on 16/7/27.
  */
 var username;
