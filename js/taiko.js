@@ -389,51 +389,49 @@ function gameEnd() {
     document.getElementById("endmusic").play();
     queryScore();
 }
-//Save user score
-function saveScore(){
-    var db = openDatabase("demo100","","",1024*1024*10);
-    db.transaction(function(tx){
-        tx.executeSql("create table if not exists scoreRank(username varchar(50), score varchar(50))");
-    },function(trans,err){
-        console.log(err);
-    });
-    db.transaction(function(tx){
-        tx.executeSql("insert into scoreRank values(?,?)",[username,scoreNumber]);
-    },function(trans,err){
-        console.log(trans);
-        console.log(err)
-    },function(success){
-        console.log(success);
+// 保存用户分数
+function saveScore() {
+    var db = openDatabase("demo100", "", "", 1024 * 1024 * 10);
+    db.transaction(function (tx) {
+        tx.executeSql("create table if not exists scoreRank(username varchar(50), score varchar(50))", [], function () {
+            // 创建表成功后插入数据
+            tx.executeSql("insert into scoreRank values(?,?)", [username, scoreNumber], function () {
+                console.log("数据插入成功");
+            }, function (trans, err) {
+                console.log("数据插入失败", err);
+            });
+        }, function (trans, err) {
+            console.log("创建表失败", err);
+        });
     });
 }
-//Get leaderboard
-function queryScore(){
-    var db = openDatabase("demo100","","",1024*1024*10);
-    db.transaction(function(tx){
-        tx.executeSql("select * from scoreRank order by score desc",[],function(trans,rs){
-            console.log(rs.rows.length);
-            if(rs.rows.length==0){return;}
-            else if(rs.rows.length==1){
-                document.getElementById("scoreRank").innerHTML='<tr><td><div id="firstIcon"></div></td><td>'+
-                    rs.rows[0].username+'</td><td>'+rs.rows[0].score+'</td></tr>'+
-                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>'+
+
+// 获取排行榜
+function queryScore() {
+    var db = openDatabase("demo100", "", "", 1024 * 1024 * 10);
+    db.transaction(function (tx) {
+        tx.executeSql("select * from scoreRank order by score desc", [], function (trans, rs) {
+            var html = "";
+            if (rs.rows.length == 0) {
+                html = '<tr><td><div id="firstIcon"></div></td><td>No data</td><td>No data</td></tr>' +
+                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>' +
                     '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            }
-            else if(rs.rows.length==2){
-                document.getElementById("scoreRank").innerHTML='<tr><td><div id="firstIcon"></div></td><td>'+
-                    rs.rows[0].username+'</td><td>'+rs.rows[0].score+'</td></tr>'+
-                    '<tr><td><div id="secondIcon"></div></td><td>'+
-                    rs.rows[1].username+'</td><td>'+rs.rows[1].score+'</td></tr>'+
+            } else if (rs.rows.length == 1) {
+                html = '<tr><td><div id="firstIcon"></div></td><td>' +
+                    rs.rows[0].username + '</td><td>' + rs.rows[0].score + '</td></tr>' +
+                    '<tr><td><div id="secondIcon"></div></td><td>No data</td><td>No data</td></tr>' +
                     '<tr><td><div id="thirdIcon"></div></td><td>No data</td><td>No data</td></tr>';
-            }
-            else if(rs.rows.length>2) {
-                document.getElementById("scoreRank").innerHTML = '<tr><td><div id="firstIcon"></div></td><td>' +
+            } else if (rs.rows.length > 2) {
+                html = '<tr><td><div id="firstIcon"></div></td><td>' +
                     rs.rows[0].username + '</td><td>' + rs.rows[0].score + '</td></tr>' +
                     '<tr><td><div id="secondIcon"></div></td><td>' +
                     rs.rows[1].username + '</td><td>' + rs.rows[1].score + '</td></tr>' +
                     '<tr><td><div id="thirdIcon"></div></td><td>' +
                     rs.rows[2].username + '</td><td>' + rs.rows[2].score + '</td></tr>';
             }
+            document.getElementById("scoreRank").innerHTML = html;
+        }, function (trans, err) {
+            console.log("查询排行榜失败", err);
         });
     });
 }
