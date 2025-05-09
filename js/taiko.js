@@ -1,4 +1,31 @@
-// 存储分数到本地存储
+// 游戏开始函数
+function gameStart() {
+    const username = document.getElementById('username').value;
+    
+    if (!username) {
+        document.querySelector('#startBox h4').textContent = 'Please enter your nickname!';
+        return;
+    }
+    
+    // 隐藏开始界面，显示规则界面
+    document.getElementById('startBox').style.display = 'none';
+    document.getElementById('ruleBox').style.display = 'block';
+    
+    // 播放游戏开始音乐
+    document.getElementById('gamestart').play();
+}
+
+// 游戏结束时调用（在适当的位置）
+function someGameOverCondition() {
+    const finalScore = parseInt(document.getElementById('scoreBoard').textContent);
+    gameOver(finalScore);
+}// 页面加载完成后执行
+window.onload = function() {
+    // 初始化排行榜
+    updateLeaderboard();
+    
+    // 其他初始化代码...
+};// 存储分数到本地存储
 function saveScore(username, score) {
     // 获取现有分数
     let scores = JSON.parse(localStorage.getItem('taikoScores')) || [];
