@@ -629,3 +629,72 @@ window.onload = function() {
   // 初始化钱包连接功能
   initWalletConnection();
 };
+// Solana钱包连接相关变量
+let wallet;
+let connection;
+let publicKey;
+
+// 初始化Solana连接
+function initSolana() {
+  try {
+    // 检查库是否正确加载
+    if (!window.SolanaWalletAdapterWALLETS) {
+      throw new Error('Solana wallet adapter library not loaded');
+    }
+    
+    // 连接到Solana devnet网络
+    const connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl('devnet'),
+      'confirmed'
+    );
+    
+    // 初始化可用的钱包适配器
+    const wallets = [
+      new window.SolanaWalletAdapterWALLETS.PhantomWalletAdapter(),
+      new window.SolanaWalletAdapterWALLETS.SolflareWalletAdapter(),
+    ];
+    
+    return { connection, wallets };
+  } catch (error) {
+    console.error('Failed to initialize Solana:', error);
+    alert('Failed to load Solana wallet support: ' + error.message);
+    throw error;
+  }
+}
+
+// 连接钱包
+async function connectWallet() {
+  try {
+    const { wallets } = initSolana();
+    
+    // 尝试连接Phantom钱包
+    wallet = wallets.find(wallet => wallet.name === 'Phantom');
+    
+    if (!wallet) {
+      alert('Phantom wallet not found. Please install Phantom extension.');
+      return;
+    }
+    
+    // 监听钱包连接状态变化
+    wallet.on('connect', (publicKey) => {
+      console.log('Wallet connected:', publicKey.toBase58());
+      updateWalletUI(publicKey);
+    });
+    
+    wallet.on('disconnect', () => {
+      console.log('Wallet disconnected');
+      updateWalletUI(null);
+    });
+    
+    // 连接钱包
+    await wallet.connect();
+    publicKey = wallet.publicKey;
+    updateWalletUI(publicKey);
+    
+    console.log('Wallet connected successfully');
+    
+  } catch (error) {
+    console.error('Error connecting wallet:', error);
+    alert('Failed to connect wallet: ' + error.message);
+  }
+}
