@@ -503,3 +503,129 @@ function updateLeaderboard(scores) {
     
     scoreRank.innerHTML = html;
 }
+// 在taiko.js文件中添加以下代码
+
+// Solana钱包连接相关变量
+let wallet;
+let connection;
+let publicKey;
+
+// 初始化Solana连接
+function initSolana() {
+  // 连接到Solana devnet网络
+  connection = new solanaWeb3.Connection(
+    solanaWeb3.clusterApiUrl('devnet'),
+    'confirmed'
+  );
+  
+  // 初始化可用的钱包适配器
+  const wallets = [
+    new WalletAdaptersWallets.PhantomWalletAdapter(),
+    new WalletAdaptersWallets.SolflareWalletAdapter(),
+    // 可以添加更多支持的钱包
+  ];
+  
+  return { connection, wallets };
+}
+
+// 连接钱包
+async function connectWallet() {
+  try {
+    const { wallets } = initSolana();
+    
+    // 尝试连接Phantom钱包
+    wallet = wallets.find(wallet => wallet.name === 'Phantom');
+    
+    if (!wallet) {
+      alert('Phantom wallet not found. Please install Phantom extension.');
+      return;
+    }
+    
+    // 监听钱包连接状态变化
+    wallet.on('connect', (publicKey) => {
+      console.log('Wallet connected:', publicKey.toBase58());
+      updateWalletUI(publicKey);
+    });
+    
+    wallet.on('disconnect', () => {
+      console.log('Wallet disconnected');
+      updateWalletUI(null);
+    });
+    
+    // 连接钱包
+    await wallet.connect();
+    publicKey = wallet.publicKey;
+    updateWalletUI(publicKey);
+    
+    // 可以在这里添加连接成功后的逻辑，如记录用户钱包地址等
+    console.log('Wallet connected successfully');
+    
+  } catch (error) {
+    console.error('Error connecting wallet:', error);
+    alert('Failed to connect wallet: ' + error.message);
+  }
+}
+
+// 断开钱包连接
+async function disconnectWallet() {
+  if (wallet) {
+    try {
+      await wallet.disconnect();
+      updateWalletUI(null);
+    } catch (error) {
+      console.error('Error disconnecting wallet:', error);
+      alert('Failed to disconnect wallet: ' + error.message);
+    }
+  }
+}
+
+// 更新钱包UI显示
+function updateWalletUI(publicKey) {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const walletInfo = document.getElementById('walletInfo');
+  const walletAddress = document.getElementById('walletAddress');
+  
+  if (publicKey) {
+    connectBtn.style.display = 'none';
+    walletInfo.style.display = 'inline-block';
+    walletAddress.textContent = publicKey.toBase58();
+  } else {
+    connectBtn.style.display = 'inline-block';
+    walletInfo.style.display = 'none';
+  }
+}
+
+// 获取钱包余额
+async function getWalletBalance() {
+  if (!publicKey || !connection) return 0;
+  
+  try {
+    const balance = await connection.getBalance(publicKey);
+    return solanaWeb3.LAMPORTS_PER_SOL;
+  } catch (error) {
+    console.error('Error getting balance:', error);
+    return 0;
+  }
+}
+
+// 初始化钱包连接功能
+function initWalletConnection() {
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const disconnectBtn = document.getElementById('disconnectWalletBtn');
+  
+  if (connectBtn && disconnectBtn) {
+    connectBtn.addEventListener('click', connectWallet);
+    disconnectBtn.addEventListener('click', disconnectWallet);
+  }
+}
+
+// 在window.onload中初始化钱包连接
+window.onload = function() {
+  document.getElementById("bgmusic").play();
+  setTimeout(function () {
+    document.getElementById("title_call").play();
+  },500);
+  
+  // 初始化钱包连接功能
+  initWalletConnection();
+};
